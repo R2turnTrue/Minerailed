@@ -3,11 +3,11 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
     // Apply the Kotlin JVM plugin to add support for Kotlin.
-    id("org.jetbrains.kotlin.jvm") version "1.7.10"
+    id("org.jetbrains.kotlin.jvm") version "1.7.20"
     // Kotlinx serialization for any data format
-    kotlin("plugin.serialization") version "1.7.10"
+    kotlin("plugin.serialization") version "1.7.20"
     // Shade the plugin
-    id("com.github.johnrengelman.shadow") version "7.0.0"
+    id("com.github.johnrengelman.shadow") version "7.1.2"
     // Allow publishing
     `maven-publish`
 
@@ -28,6 +28,8 @@ repositories {
 }
 
 dependencies {
+    implementation("de.articdive:jnoise-pipeline:4.0.0")
+
     // Align versions of all Kotlin components
     compileOnly(platform("org.jetbrains.kotlin:kotlin-bom"))
 
@@ -38,7 +40,7 @@ dependencies {
     compileOnly(kotlin("reflect"))
 
     // Compile Minestom into project
-    compileOnly("com.github.Minestom:Minestom:4a976a3333")
+    compileOnly("com.github.Minestom:Minestom:7867313290")
 
     // import kotlinx serialization
     compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:1.4.1")
