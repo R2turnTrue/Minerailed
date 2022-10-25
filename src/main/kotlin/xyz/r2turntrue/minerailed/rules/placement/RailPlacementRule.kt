@@ -6,9 +6,7 @@ import net.minestom.server.instance.Instance
 import net.minestom.server.instance.block.Block
 import net.minestom.server.instance.block.BlockFace
 import net.minestom.server.instance.block.rule.BlockPlacementRule
-import xyz.r2turntrue.minerailed.coord.BlockPos
-import xyz.r2turntrue.minerailed.coord.toBlockPos
-import xyz.r2turntrue.minerailed.coord.toPos
+import xyz.r2turntrue.minerailed.coord.*
 import xyz.r2turntrue.minerailed.utils.nearBlockPos
 import kotlin.math.abs
 
@@ -48,6 +46,37 @@ object RailPlacementRule : BlockPlacementRule(Block.RAIL) {
             "waterlogged" to "false"
         )
 
+    private fun trackRail(root: BlockPos, instance: Instance, exclude: List<BlockPos> = listOf()): BlockPos? {
+        return root.nearBlockPos()
+            .map { Pair(it, instance.getBlock(it)) }
+            .firstOrNull { !exclude.contains(it.first) || it.second.compare(Block.RAIL) }
+            ?.let { it.first }
+    }
+
+    private enum class WhereIsFrom {
+        POSITIVE_X, // +X
+        NEGATIVE_X, // -X
+        POSITIVE_Z, // +Z
+        NEGATIVE_Z, // -Z
+        UNKNOWN
+    }
+
+    private fun whereIsFrom(root: BlockPos, other: BlockPos): WhereIsFrom {
+        val xOff = root.blockX - other.blockX
+        val zOff = root.blockZ - other.blockZ
+
+        return if(xOff >= 1)
+            WhereIsFrom.POSITIVE_X
+        else if(xOff < 0)
+            WhereIsFrom.NEGATIVE_X
+        else if(zOff >= 1)
+            WhereIsFrom.POSITIVE_Z
+        else if(zOff < 0)
+            WhereIsFrom.NEGATIVE_Z
+        else
+            WhereIsFrom.UNKNOWN
+    }
+
     private fun getShape(player: Player, blockPosition: Point, instance: Instance): Shape {
         var degrees = (player.position.yaw() - 90) % 360
         if (degrees < 0) {
@@ -67,79 +96,45 @@ object RailPlacementRule : BlockPlacementRule(Block.RAIL) {
 
         val blockPos = blockPosition.toBlockPos()
 
-        blockPosition.nearBlockPos()
-            .map { Pair(it.toBlockPos(), instance.getBlock(it)) }
-            .firstOrNull { it.second.compare(Block.RAIL) }
+        trackRail(blockPos, instance)
             ?.also {
-                val xOff = blockPos.blockX - it.first.blockX
-                val zOff = blockPos.blockZ - it.first.blockZ
-
-                if(abs(xOff) == 1) {
+                val wh = whereIsFrom(blockPos, it)
+                if(wh == WhereIsFrom.POSITIVE_X || wh == WhereIsFrom.NEGATIVE_X)
                     temp = Shape.EAST_WEST
-                    if(xOff == 1) {
-                        instance.setBlock(blockPosition.sub(1.0, 0.0, 0.0), Block.RAIL.withProperties(
-                            buildProperties(Shape.EAST_WEST)
-                        ))
-                    } else if(xOff == -1) {
-                        instance.setBlock(blockPosition.sub(-1.0, 0.0, 0.0), Block.RAIL.withProperties(
-                            buildProperties(Shape.EAST_WEST)
-                        ))
-                    }
-                } else {
-                    temp = Shape.NORTH_SOUTH
-                    if(zOff == 1) {
-                        instance.setBlock(blockPosition.sub(0.0, 0.0, 1.0), Block.RAIL.withProperties(
-                            buildProperties(Shape.NORTH_SOUTH)
-                        ))
-                    } else if(zOff == -1) {
-                        instance.setBlock(blockPosition.sub(0.0, 0.0, -1.0), Block.RAIL.withProperties(
-                            buildProperties(Shape.NORTH_SOUTH)
-                        ))
-                    }
-                }
+                if(wh == WhereIsFrom.POSITIVE_Z || wh == WhereIsFrom.NEGATIVE_Z)
+                    temp = Shape.EAST_WEST
 
-                // check there's curve in previous rail
-                if(xOff == -1) { /* Left/Right in z as down */
-                    checkCurve(player, it.first, instance, -1, 0)
-                } else if (xOff == 1) {
-                    checkCurve(player, it.first, instance, 1, 0)
-                } else if (zOff == -1) { /* Up/Down */
-                    checkCurve(player, it.first, instance, 0, -1)
-                } else if (zOff == 1) {
-                    checkCurve(player, it.first, instance, 0, 1)
-                }
+                trackRail(it, instance, listOf(blockPos, it))
+                    ?.also { prepre ->
+                        val prepreWh = whereIsFrom(it, prepre)
+                        if (wh == WhereIsFrom.POSITIVE_X) {
+                            if (prepreWh == WhereIsFrom.POSITIVE_Z) {
+                                instance.setBlock(
+                                    it, Block.RAIL
+                                        .withProperties(buildProperties(Shape.SOUTH_WEST))
+                                )
+                            } else if (prepreWh == WhereIsFrom.NEGATIVE_Z) {
+                                instance.setBlock(
+                                    it, Block.RAIL
+                                        .withProperties(buildProperties(Shape.NORTH_WEST))
+                                )
+                            }
+                        } else if (wh == WhereIsFrom.POSITIVE_Z) {
+                            if (prepreWh == WhereIsFrom.POSITIVE_X) {
+                                instance.setBlock(
+                                    it, Block.RAIL
+                                        .withProperties(buildProperties(Shape.SOUTH_EAST))
+                                )
+                            } else if (prepreWh == WhereIsFrom.NEGATIVE_X) {
+                                instance.setBlock(
+                                    it, Block.RAIL
+                                        .withProperties(buildProperties(Shape.NORTH_EAST))
+                                )
+                            }
+                        }
+                    }
             }
 
         return temp
-    }
-
-    private fun checkCurve(player: Player, previousBlockPosition: BlockPos, instance: Instance, xOff: Int, zOff: Int) {
-        val pos = previousBlockPosition.toPos()
-        previousBlockPosition.toPos().nearBlockPos()
-            .map { it.toBlockPos() }
-            .firstOrNull() // find preprevious rail
-            ?.also { preprevious ->
-                if(abs(zOff) == 1) { // xOff == 0 have difference on Z?
-                    if(previousBlockPosition.blockX - preprevious.blockX == 1) {
-                        instance.setBlock(pos, Block.RAIL.withProperties(
-                            buildProperties(Shape.SOUTH_EAST)
-                        ))
-                    } else if(previousBlockPosition.blockX - preprevious.blockX == -1) {
-                        instance.setBlock(pos, Block.RAIL.withProperties(
-                            buildProperties(Shape.SOUTH_WEST)
-                        ))
-                    }
-                } else if(abs(xOff) == 1) { // zOff == 0 have difference on X?
-                    if(previousBlockPosition.blockZ - preprevious.blockZ == 1) {
-                        instance.setBlock(pos, Block.RAIL.withProperties(
-                            buildProperties(Shape.NORTH_EAST)
-                        ))
-                    } else if(previousBlockPosition.blockZ - preprevious.blockZ == -1) {
-                        instance.setBlock(pos, Block.RAIL.withProperties(
-                            buildProperties(Shape.NORTH_WEST)
-                        ))
-                    }
-                }
-            }
     }
 }
