@@ -11,9 +11,9 @@ fun Point.nearBlockPos(): List<Pos> =
         Pos((blockX() - 0).toDouble(), blockY().toDouble(), (blockZ() - 1).toDouble())
     )
 
-fun BlockPos.nearBlockPos(): List<BlockPos> =
+fun BlockPos.nearBlockPos(yOff: Int): List<BlockPos> =
     listOf(
-        BlockPos(this.blockX, this.blockY, this.blockZ + 1),
-        BlockPos(this.blockX - 1, this.blockY, this.blockZ), BlockPos(this.blockX + 1, this.blockY, this.blockZ),
-        BlockPos(this.blockX, this.blockY, this.blockZ - 1)
+        BlockPos(this.blockX, this.blockY + 1, this.blockZ + 1),
+        BlockPos(this.blockX - 1, this.blockY + yOff, this.blockZ), BlockPos(this.blockX + 1, this.blockY + yOff, this.blockZ),
+        BlockPos(this.blockX, this.blockY + yOff, this.blockZ - 1)
     )

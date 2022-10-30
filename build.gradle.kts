@@ -28,7 +28,6 @@ repositories {
 }
 
 dependencies {
-    implementation("de.articdive:jnoise-pipeline:4.0.0")
 
     // Align versions of all Kotlin components
     compileOnly(platform("org.jetbrains.kotlin:kotlin-bom"))

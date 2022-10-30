@@ -1,17 +1,12 @@
 package xyz.r2turntrue.minerailed.commands
 
-import de.articdive.jnoise.generators.noise_parameters.fade_functions.FadeFunction
-import de.articdive.jnoise.generators.noise_parameters.interpolation.Interpolation
-import de.articdive.jnoise.generators.noisegen.perlin.PerlinNoiseGenerator
-import de.articdive.jnoise.pipeline.JNoise
 import net.minestom.server.MinecraftServer
 import net.minestom.server.command.builder.Command
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.Player
 import net.minestom.server.instance.block.Block
 import xyz.r2turntrue.minerailed.dim
-import java.util.*
-import kotlin.math.roundToInt
+import kotlin.random.Random
 
 object NewGame : Command("newgame") {
 
@@ -19,22 +14,50 @@ object NewGame : Command("newgame") {
         setDefaultExecutor { sender, _ ->
             sender.sendMessage("Creating instance")
             val instance = MinecraftServer.getInstanceManager().createInstanceContainer(dim)
-            val noise = JNoise.newBuilder()
-                .perlin(PerlinNoiseGenerator.newBuilder()
-                    .setSeed(Random().nextLong())
-                    .setInterpolation(Interpolation.COSINE)
-                    .setFadeFunction(FadeFunction.IMPROVED_PERLIN_NOISE))
-                .build()
+            val layers = arrayOf(
+                newNoise(Random.nextInt(), 0.1F), // water
+                newNoise(Random.nextInt(), 0.3F), // stone
+                newNoise(Random.nextInt(), 0.13F), // iron
+                newNoise(Random.nextInt(), 0.13F), // trees
+            )
             instance.setGenerator { unit ->
                 val start = unit.absoluteStart()
-
-                for(x in 0 until unit.size().blockX()) {
-                    for(z in 0 until unit.size().blockZ()) {
+                val size = unit.size()
+                if(unit.absoluteStart().blockX() / 16 != 0)
+                    return@setGenerator
+                for (x in 0 until size.blockX()) {
+                    for (z in 0 until size.blockZ()) {
                         val bottom = start.add(x.toDouble(), 0.0, z.toDouble())
 
-                        synchronized(noise) {
-                            unit.modifier().fill(bottom, bottom, Block.STONE)
-                            println(noise.evaluateNoise(x.toDouble(), z.toDouble()).roundToInt())
+                        // surface building
+                        val c = layers[0].GetNoise(bottom.x().toFloat(), bottom.z().toFloat()) + 1.0F
+                        //println("${bottom.x()} ; ${bottom.z()} = ${noise.GetNoise(bottom.x().toFloat(), bottom.z().toFloat()) + 1.0F}")
+                        var waterBuilded = false
+                        if(c < 0.6) {
+                            unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 0.0 + 2, z.toDouble()), Block.BARRIER)
+                            unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 0.0 + 1, z.toDouble()), Block.BARRIER)
+                            unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 0.0, z.toDouble()), Block.WATER)
+                            unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 0.0 - 1, z.toDouble()), Block.SAND)
+                            waterBuilded = true
+                        } else {
+                            unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 0.0, z.toDouble()), Block.GRASS_BLOCK)
+                        }
+
+                        if(!waterBuilded) {
+                            val stoneNoise = layers[1].GetNoise(bottom.x().toFloat(), bottom.z().toFloat()) + 1.0F
+                            val ironNoise = layers[2].GetNoise(bottom.x().toFloat(), bottom.z().toFloat()) + 1.0F
+                            val treeNoise = layers[3].GetNoise(bottom.x().toFloat(), bottom.z().toFloat()) + 1.0F
+
+                            if(stoneNoise < 0.4) {
+                                unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 1.0, z.toDouble()), Block.STONE)
+                                unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 2.0, z.toDouble()), Block.STONE)
+                            } else if(ironNoise < 0.5) {
+                                unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 2.0, z.toDouble()), Block.BARRIER)
+                                unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 1.0, z.toDouble()), Block.IRON_BLOCK)
+                            } else if(treeNoise < 0.5) {
+                                unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 2.0, z.toDouble()), Block.BARRIER)
+                                unit.modifier().setBlock(start.add(x.toDouble(), Math.min(40 - start.blockY(), size.blockY()) + 1.0, z.toDouble()), Block.OAK_LOG)
+                            }
                         }
                     }
                 }
