@@ -36,29 +36,29 @@ object RailPreviewer {
             spawnedPlayers.remove(it.player)
         }
         eventNode.addListener(PlayerBlockPlaceEvent::class.java) {
-            if(it.block.compare(Block.RAIL)) {
-                val down = it.blockPosition.sub(0.0, 2.0, 0.0)
-                it.isCancelled = true
-                //println(it.instance.getBlock(down))
-                if(it.instance.getBlock(down).compare(Block.GRASS_BLOCK)) {
-                    val player = it.player
-                    val shape = player.inventory.itemInMainHand.getTag(railShapeTag)
-                    player.setHeldItemSlot(7)
-                    player.inventory.clear()
-                    if(player in previewPos) {
-                        previewPos[player]?.let { preview ->
-                            player.sendPacket(BlockChangePacket(preview.toPos(), Block.AIR))
-                        }
-                        previewPos.remove(player)
-                    }
-                    it.instance.setBlock(it.blockPosition.sub(0.0, 1.0, 0.0), Block.RAIL.withProperties(
-                        mapOf(
-                            "waterlogged" to "false",
-                            "shape" to shape
-                        )
-                    ).withTag(placedRail, true))
+            if (!it.block.compare(Block.RAIL)) return@addListener
+            val down = it.blockPosition.sub(0.0, 2.0, 0.0)
+            it.isCancelled = true
+            //println(it.instance.getBlock(down))
+            if (!it.instance.getBlock(down).compare(Block.GRASS_BLOCK)) return@addListener
+            val player = it.player
+            val shape = player.inventory.itemInMainHand.getTag(railShapeTag)
+            player.setHeldItemSlot(7)
+            player.inventory.clear()
+            if (player in previewPos) {
+                previewPos[player]?.let { preview ->
+                    player.sendPacket(BlockChangePacket(preview.toPos(), Block.AIR))
                 }
+                previewPos.remove(player)
             }
+            it.instance.setBlock(
+                it.blockPosition.sub(0.0, 1.0, 0.0), Block.RAIL.withProperties(
+                    mapOf(
+                        "waterlogged" to "false",
+                        "shape" to shape
+                    )
+                ).withTag(placedRail, true)
+            )
         }
         CompletableFuture.runAsync {
             while (true) {
@@ -72,11 +72,10 @@ object RailPreviewer {
                         = player.instance!!.getBlock(pos)
 
                     fun goElse() {
-                        if(previewPos.contains(player)) {
-                            previewPos[player]
-                                ?.also { preview ->
-                                    player.sendPacket(BlockChangePacket(preview.toPos(), Block.AIR))
-                                }
+                        if(player in previewPos) {
+                            previewPos[player]?.let { preview ->
+                                player.sendPacket(BlockChangePacket(preview.toPos(), Block.AIR))
+                            }
                             previewPos.remove(player)
                         }
                     }
